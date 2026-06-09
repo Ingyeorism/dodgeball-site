@@ -1,0 +1,25 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /leagues/dodgeball-reunion-2026/matches/{matchId} {
+      allow read: if true;
+      allow write: if isValidMatch(matchId, request.resource.data);
+    }
+  }
+
+  function isValidMatch(matchId, data) {
+    return matchId.matches('^[0-9]+$')
+      && data.keys().hasOnly(['id', 'sets', 'status', 'updatedAt'])
+      && data.id is int
+      && data.id >= 1
+      && data.id <= 21
+      && data.status in ['대기', '완료']
+      && data.sets is list
+      && data.sets.size() == 4
+      && data.sets[0] in [0, 1, 2, 3]
+      && data.sets[1] in [0, 1, 2, 3]
+      && data.sets[2] in [0, 1, 2, 3]
+      && data.sets[3] in [0, 1, 2, 3];
+  }
+}

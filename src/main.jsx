@@ -21,8 +21,8 @@ import {
   X
 } from 'lucide-react';
 import './styles.css';
+import { isFirebaseConfigured, saveRemoteMatch, subscribeToRemoteMatches } from './firebase';
 
-const STORAGE_KEY = 'dodgeballReunionMatches';
 const ADMIN_PASSWORD = '20265';
 const SET_LABELS = ['남성', '여성', '혼성A', '혼성B'];
 const setCompositionTable = {
@@ -310,14 +310,26 @@ function App() {
   const [scoreDrafts, setScoreDrafts] = useState({});
   const [timeLeft, setTimeLeft] = useState(360);
   const [isRunning, setIsRunning] = useState(false);
-  const [matches, setMatches] = useState(() => loadMatches());
+  const [matches, setMatches] = useState(initialMatches);
+  const [storageStatus, setStorageStatus] = useState(isFirebaseConfigured() ? 'connecting' : 'error');
 
   const selectedMatch = matches.find((match) => match.id === selectedMatchId) ?? null;
   const tempSets = selectedMatch ? scoreDrafts[selectedMatch.id] ?? selectedMatch.sets : [0, 0, 0, 0];
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(matches));
-  }, [matches]);
+    if (!isFirebaseConfigured()) return undefined;
+
+    return subscribeToRemoteMatches(
+      (remoteMatches) => {
+        setMatches(mergeSavedMatches(remoteMatches));
+        setStorageStatus('synced');
+      },
+      (error) => {
+        console.error('Failed to subscribe to Firebase matches', error);
+        setStorageStatus('error');
+      }
+    );
+  }, []);
 
   useEffect(() => {
     if (!isRunning || timeLeft === 0) return undefined;
@@ -394,12 +406,33 @@ function App() {
     }));
   };
 
-  const saveScore = () => {
+  const persistMatch = async (nextMatch) => {
+    if (!isFirebaseConfigured()) {
+      setStorageStatus('error');
+      window.alert('Firebase 설정이 없어 결과를 저장할 수 없습니다. 관리자에게 Firebase 환경변수 설정을 요청하세요.');
+      return false;
+    }
+
+    setStorageStatus('saving');
+    try {
+      await saveRemoteMatch(nextMatch);
+      setStorageStatus('synced');
+      return true;
+    } catch (error) {
+      console.error('Failed to save match to Firebase', error);
+      setStorageStatus('error');
+      window.alert('Firebase 저장에 실패했습니다. 네트워크나 Firestore 권한 설정을 확인하세요.');
+      return false;
+    }
+  };
+
+  const saveScore = async () => {
     if (!selectedMatch) return;
     if (tempSets.includes(0) && !window.confirm('입력하지 않은 세트가 있습니다. 그래도 저장할까요?')) return;
-    setMatches((current) =>
-      current.map((match) => (match.id === selectedMatch.id ? { ...match, sets: tempSets, status: STATUS.done } : match))
-    );
+    const nextMatch = { ...selectedMatch, sets: tempSets, status: STATUS.done };
+    setMatches((current) => current.map((match) => (match.id === selectedMatch.id ? nextMatch : match)));
+    const saved = await persistMatch(nextMatch);
+    if (!saved) setMatches((current) => current.map((match) => (match.id === selectedMatch.id ? selectedMatch : match)));
     setScoreDrafts((current) => {
       const next = { ...current };
       delete next[selectedMatch.id];
@@ -407,11 +440,14 @@ function App() {
     });
   };
 
-  const resetMatch = (matchId) => {
+  const resetMatch = async (matchId) => {
     if (!window.confirm('이 경기 결과를 초기화할까요?')) return;
-    setMatches((current) =>
-      current.map((match) => (match.id === matchId ? { ...match, sets: [0, 0, 0, 0], status: STATUS.pending } : match))
-    );
+    const previousMatch = matches.find((match) => match.id === matchId);
+    if (!previousMatch) return;
+    const nextMatch = { ...previousMatch, sets: [0, 0, 0, 0], status: STATUS.pending };
+    setMatches((current) => current.map((match) => (match.id === matchId ? nextMatch : match)));
+    const saved = await persistMatch(nextMatch);
+    if (!saved) setMatches((current) => current.map((match) => (match.id === matchId ? previousMatch : match)));
     setScoreDrafts((current) => {
       const next = { ...current };
       delete next[matchId];
@@ -425,6 +461,7 @@ function App() {
         <div>
           <h1>가능초 5학년 피구 리그</h1>
           {isAdmin && <span className="admin-badge">관리자 모드</span>}
+          <StorageBadge status={storageStatus} />
         </div>
         <button
           aria-label={isAdmin ? '관리자 로그아웃' : '관리자 로그인'}
@@ -470,6 +507,17 @@ function App() {
       {showLogin && <LoginModal handleLogin={handleLogin} onClose={() => setShowLogin(false)} />}
     </div>
   );
+}
+
+function StorageBadge({ status }) {
+  const labels = {
+    connecting: 'Firebase 연결 중',
+    saving: 'Firebase 저장 중',
+    synced: 'Firebase 동기화됨',
+    error: 'Firebase 오류'
+  };
+
+  return <span className={`storage-badge ${status}`}>{labels[status] ?? labels.error}</span>;
 }
 
 function Standings({ standings }) {
@@ -825,22 +873,17 @@ function getNearestMatchDate() {
   }, initialMatches[0]).date;
 }
 
-function loadMatches() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
-    if (!Array.isArray(saved)) return initialMatches;
-    const savedById = new Map(saved.map((match) => [match.id, match]));
-    return initialMatches.map((match) => {
-      const savedMatch = savedById.get(match.id);
-      if (!savedMatch || !Array.isArray(savedMatch.sets)) return match;
-      const sets = savedMatch.sets.slice(0, 4).map((set) => (Number.isInteger(set) && set >= 0 && set <= 3 ? set : 0));
-      while (sets.length < 4) sets.push(0);
-      const status = savedMatch.status === STATUS.done || sets.every((set) => set > 0) ? STATUS.done : STATUS.pending;
-      return { ...match, sets, status };
-    });
-  } catch {
-    return initialMatches;
-  }
+function mergeSavedMatches(saved) {
+  if (!Array.isArray(saved)) return initialMatches;
+  const savedById = new Map(saved.map((match) => [match.id, match]));
+  return initialMatches.map((match) => {
+    const savedMatch = savedById.get(match.id);
+    if (!savedMatch || !Array.isArray(savedMatch.sets)) return match;
+    const sets = savedMatch.sets.slice(0, 4).map((set) => (Number.isInteger(set) && set >= 0 && set <= 3 ? set : 0));
+    while (sets.length < 4) sets.push(0);
+    const status = savedMatch.status === STATUS.done || sets.every((set) => set > 0) ? STATUS.done : STATUS.pending;
+    return { ...match, sets, status };
+  });
 }
 
 function getTempResultText(match, sets) {
