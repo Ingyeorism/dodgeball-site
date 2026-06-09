@@ -253,6 +253,11 @@ td:first-child {
   gap: 14px;
 }
 
+.schedule-workspace {
+  display: grid;
+  gap: 14px;
+}
+
 .match-card {
   padding: 18px;
 }
@@ -389,6 +394,10 @@ td:first-child {
   border: 1px solid #fecdd3;
   background: #fff;
   color: #e11d48;
+}
+
+.admin-actions .selected-action {
+  background: #2563eb;
 }
 
 .rule-card {
@@ -691,6 +700,15 @@ td:first-child {
   box-shadow: 0 -22px 70px rgba(15, 23, 42, 0.2);
 }
 
+.inline-score-sheet {
+  width: 100%;
+  max-height: none;
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  box-shadow: 0 7px 24px rgba(15, 23, 42, 0.04);
+}
+
 .sheet-handle {
   width: 52px;
   height: 5px;
@@ -798,6 +816,10 @@ td:first-child {
   background: #fff;
 }
 
+.inline-score-sheet .save-area {
+  bottom: 0;
+}
+
 .save-area div {
   margin-bottom: 10px;
   padding: 12px;
@@ -825,6 +847,20 @@ td:first-child {
 }
 
 @media (min-width: 980px) {
+  .schedule-workspace.with-score-panel {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
+    align-items: start;
+  }
+
+  .schedule-workspace.with-score-panel .match-list {
+    grid-template-columns: 1fr;
+  }
+
+  .inline-score-sheet {
+    position: sticky;
+    top: 150px;
+  }
+
   .rule-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;

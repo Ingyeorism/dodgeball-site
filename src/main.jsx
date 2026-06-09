@@ -304,7 +304,6 @@ const rules = [
 function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
-  const [showScoreModal, setShowScoreModal] = useState(false);
   const [activeTab, setActiveTab] = useState('standings');
   const [selectedDate, setSelectedDate] = useState(getNearestMatchDate());
   const [selectedMatchId, setSelectedMatchId] = useState(null);
@@ -383,8 +382,8 @@ function App() {
 
   const openScoreModal = (match) => {
     setSelectedMatchId(match.id);
+    setSelectedDate(match.date);
     setScoreDrafts((current) => ({ ...current, [match.id]: current[match.id] ?? [...match.sets] }));
-    setShowScoreModal(true);
   };
 
   const updateTempSet = (setIndex, value) => {
@@ -406,7 +405,6 @@ function App() {
       delete next[selectedMatch.id];
       return next;
     });
-    setShowScoreModal(false);
   };
 
   const resetMatch = (matchId) => {
@@ -455,8 +453,12 @@ function App() {
             matches={matches}
             onOpenScore={openScoreModal}
             onReset={resetMatch}
+            onSaveScore={saveScore}
+            onUpdateTempSet={updateTempSet}
+            selectedMatch={selectedMatch}
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
+            tempSets={tempSets}
           />
         )}
         {activeTab === 'rules' && <Rules />}
@@ -466,15 +468,6 @@ function App() {
       </main>
 
       {showLogin && <LoginModal handleLogin={handleLogin} onClose={() => setShowLogin(false)} />}
-      {showScoreModal && selectedMatch && (
-        <ScoreModal
-          onClose={() => setShowScoreModal(false)}
-          onSave={saveScore}
-          selectedMatch={selectedMatch}
-          tempSets={tempSets}
-          updateTempSet={updateTempSet}
-        />
-      )}
     </div>
   );
 }
@@ -502,7 +495,7 @@ function Standings({ standings }) {
                 <td>{team.name}</td>
                 <td className="points">{team.points}</td>
                 <td>
-                  {team.played}경 {team.win}승 {team.draw}무 {team.lose}패
+                  {team.win}승 {team.draw}무 {team.lose}패
                 </td>
               </tr>
             ))}
@@ -517,7 +510,18 @@ function Standings({ standings }) {
   );
 }
 
-function Schedule({ isAdmin, matches, onOpenScore, onReset, selectedDate, setSelectedDate }) {
+function Schedule({
+  isAdmin,
+  matches,
+  onOpenScore,
+  onReset,
+  onSaveScore,
+  onUpdateTempSet,
+  selectedMatch,
+  selectedDate,
+  setSelectedDate,
+  tempSets
+}) {
   return (
     <section className="view schedule-view">
       <div className="date-strip">
@@ -527,44 +531,58 @@ function Schedule({ isAdmin, matches, onOpenScore, onReset, selectedDate, setSel
           </button>
         ))}
       </div>
-      <div className="match-list">
-        {matches
-          .filter((match) => match.date === selectedDate)
-          .map((match) => (
-            <article className={`match-card ${match.status === STATUS.done ? 'done' : ''}`} key={match.id}>
-              <div className="match-meta">
-                <span>{match.court}</span>
-                <span className={match.status === STATUS.done ? 'status done' : 'status'}>
-                  {match.status === STATUS.done ? '완료' : '진행 대기'}
-                </span>
-              </div>
-              <div className="versus">
-                <strong>{match.teamA}</strong>
-                <div>
-                  <span>VS</span>
-                  {match.status === STATUS.done && (
-                    <b>
-                      {match.sets.filter((set) => set === 1).length} : {match.sets.filter((set) => set === 3).length}
-                    </b>
-                  )}
+      <div className={`schedule-workspace ${isAdmin && selectedMatch ? 'with-score-panel' : ''}`}>
+        <div className="match-list">
+          {matches
+            .filter((match) => match.date === selectedDate)
+            .map((match) => (
+              <article className={`match-card ${match.status === STATUS.done ? 'done' : ''}`} key={match.id}>
+                <div className="match-meta">
+                  <span>{match.court}</span>
+                  <span className={match.status === STATUS.done ? 'status done' : 'status'}>
+                    {match.status === STATUS.done ? '완료' : '진행 대기'}
+                  </span>
                 </div>
-                <strong>{match.teamB}</strong>
-              </div>
-              {match.status === STATUS.done && <SetDots sets={match.sets} teamA={match.teamA} teamB={match.teamB} />}
-              {isAdmin && (
-                <div className="admin-actions">
-                  <button type="button" onClick={() => onOpenScore(match)}>
-                    결과 입력 / 수정
-                  </button>
-                  {match.status === STATUS.done && (
-                    <button className="secondary" type="button" onClick={() => onReset(match.id)}>
-                      초기화
+                <div className="versus">
+                  <strong>{match.teamA}</strong>
+                  <div>
+                    <span>VS</span>
+                    {match.status === STATUS.done && (
+                      <b>
+                        {match.sets.filter((set) => set === 1).length} : {match.sets.filter((set) => set === 3).length}
+                      </b>
+                    )}
+                  </div>
+                  <strong>{match.teamB}</strong>
+                </div>
+                {match.status === STATUS.done && <SetDots sets={match.sets} teamA={match.teamA} teamB={match.teamB} />}
+                {isAdmin && (
+                  <div className="admin-actions">
+                    <button
+                      className={selectedMatch?.id === match.id ? 'selected-action' : ''}
+                      type="button"
+                      onClick={() => onOpenScore(match)}
+                    >
+                      {selectedMatch?.id === match.id ? '입력 중' : '결과 입력 / 수정'}
                     </button>
-                  )}
-                </div>
-              )}
-            </article>
-          ))}
+                    {match.status === STATUS.done && (
+                      <button className="secondary" type="button" onClick={() => onReset(match.id)}>
+                        초기화
+                      </button>
+                    )}
+                  </div>
+                )}
+              </article>
+            ))}
+        </div>
+        {isAdmin && selectedMatch && (
+          <ScorePanel
+            onSave={onSaveScore}
+            selectedMatch={selectedMatch}
+            tempSets={tempSets}
+            updateTempSet={onUpdateTempSet}
+          />
+        )}
       </div>
     </section>
   );
@@ -740,13 +758,11 @@ function LoginModal({ handleLogin, onClose }) {
   );
 }
 
-function ScoreModal({ onClose, onSave, selectedMatch, tempSets, updateTempSet }) {
+function ScorePanel({ onSave, selectedMatch, tempSets, updateTempSet }) {
   const resultText = getTempResultText(selectedMatch, tempSets);
 
   return (
-    <div className="modal-backdrop score-backdrop">
-      <section className="score-sheet">
-        <div className="sheet-handle" />
+      <section className="score-sheet inline-score-sheet">
         <div className="modal-head">
           <div>
             <h2>경기 결과 입력</h2>
@@ -754,9 +770,6 @@ function ScoreModal({ onClose, onSave, selectedMatch, tempSets, updateTempSet })
               {selectedMatch.date} · {selectedMatch.court}
             </p>
           </div>
-          <button aria-label="닫기" type="button" onClick={onClose}>
-            <X size={18} />
-          </button>
         </div>
         <div className="score-teams">
           <strong>{selectedMatch.teamA}</strong>
@@ -796,7 +809,6 @@ function ScoreModal({ onClose, onSave, selectedMatch, tempSets, updateTempSet })
           </button>
         </div>
       </section>
-    </div>
   );
 }
 
