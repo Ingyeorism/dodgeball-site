@@ -11,10 +11,6 @@ jobs:
     steps:
       - name: Ping Render URL
         env:
-          SITE_URL: ${{ secrets.SITE_URL }}
+          SITE_URL: ${{ secrets.SITE_URL || 'https://dodgeball-site.onrender.com' }}
         run: |
-          if [ -z "$SITE_URL" ]; then
-            echo "Add a SITE_URL repository secret with the deployed Render URL."
-            exit 1
-          fi
           curl --fail --silent --show-error --location "$SITE_URL" >/dev/null
