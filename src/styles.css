@@ -445,8 +445,15 @@ td:first-child {
 
 .rule-table {
   min-width: 560px;
-  margin: 14px 0 0;
+  margin: 8px 0 0;
   table-layout: auto;
+}
+
+.rule-table-caption {
+  display: block;
+  margin-top: 14px;
+  color: #334155;
+  font-size: 15px;
 }
 
 .rule-table th {
