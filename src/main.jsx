@@ -538,7 +538,6 @@ function Standings({ standings }) {
               <th>순위</th>
               <th>학급</th>
               <th>총점</th>
-              <th>경기</th>
               <th>전적</th>
             </tr>
           </thead>
@@ -551,9 +550,8 @@ function Standings({ standings }) {
                 </td>
                 <td>{team.name}</td>
                 <td className="points">{team.points}</td>
-                <td>{team.played}</td>
                 <td>
-                  {team.win}승 {team.draw}무 {team.lose}패
+                  {team.played}경기 · {team.win}승 {team.draw}무 {team.lose}패
                 </td>
               </tr>
             ))}
@@ -731,6 +729,7 @@ function RuleTable({ table }) {
 
 function GameTimer({ isRunning, setIsRunning, setTimeLeft, timeLeft }) {
   const timerRef = useRef(null);
+  const wakeLockRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -739,13 +738,76 @@ function GameTimer({ isRunning, setIsRunning, setTimeLeft, timeLeft }) {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  useEffect(() => {
+    if (!isRunning) {
+      releaseWakeLock();
+      return undefined;
+    }
+
+    requestWakeLock();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') requestWakeLock();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      releaseWakeLock();
+    };
+  }, [isRunning]);
+
+  const requestWakeLock = async () => {
+    if (!('wakeLock' in navigator) || wakeLockRef.current) return;
+    try {
+      wakeLockRef.current = await navigator.wakeLock.request('screen');
+      wakeLockRef.current.addEventListener('release', () => {
+        wakeLockRef.current = null;
+      });
+    } catch {
+      wakeLockRef.current = null;
+    }
+  };
+
+  const releaseWakeLock = async () => {
+    if (!wakeLockRef.current) return;
+    const lock = wakeLockRef.current;
+    wakeLockRef.current = null;
+    try {
+      await lock.release();
+    } catch {
+      // The browser may have already released the lock.
+    }
+  };
+
   const enterFullscreen = async () => {
     if (!timerRef.current?.requestFullscreen) return;
     await timerRef.current.requestFullscreen();
   };
 
   const exitFullscreen = async () => {
+    if (screen.orientation?.unlock) screen.orientation.unlock();
     if (document.fullscreenElement) await document.exitFullscreen();
+  };
+
+  const startTimer = async () => {
+    await enterFullscreen();
+    try {
+      await screen.orientation?.lock?.('landscape');
+    } catch {
+      // Orientation lock support differs by mobile browser.
+    }
+    await requestWakeLock();
+    setIsRunning(true);
+  };
+
+  const toggleTimer = async () => {
+    if (isRunning) {
+      setIsRunning(false);
+      await releaseWakeLock();
+      return;
+    }
+
+    await startTimer();
   };
 
   return (
@@ -772,7 +834,7 @@ function GameTimer({ isRunning, setIsRunning, setTimeLeft, timeLeft }) {
           <span style={{ width: `${(timeLeft / 360) * 100}%` }} />
         </div>
         <div className="timer-actions">
-          <button className={isRunning ? 'pause' : ''} type="button" onClick={() => setIsRunning(!isRunning)}>
+          <button className={isRunning ? 'pause' : ''} type="button" onClick={toggleTimer}>
             {isRunning ? <Pause size={20} /> : <Play size={20} />}
             {isRunning ? '일시정지' : '시작'}
           </button>
@@ -781,6 +843,7 @@ function GameTimer({ isRunning, setIsRunning, setTimeLeft, timeLeft }) {
             type="button"
             onClick={() => {
               setIsRunning(false);
+              releaseWakeLock();
               setTimeLeft(360);
             }}
           >
