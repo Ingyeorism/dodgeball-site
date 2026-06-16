@@ -636,21 +636,38 @@ td:first-child {
 
 .timer-panel:fullscreen {
   width: 100vw;
-  min-height: 100vh;
-  padding: 44px 24px 88px;
+  min-height: 100dvh;
+  padding: 24px 24px 78px;
   border: 0;
   border-radius: 0;
   background: #f8fafc;
+  align-content: center;
+  gap: 14px;
 }
 
 .timer-panel.is-fullscreen .timer-title-row,
 .timer-panel.is-fullscreen .timer-actions,
 .timer-panel.is-fullscreen .progress-bar {
-  width: min(92vw, 980px);
+  width: min(92vw, 1120px);
 }
 
 .timer-panel.is-fullscreen .time-readout {
-  font-size: clamp(110px, 22vw, 260px);
+  margin-top: 12px;
+  font-size: min(34vh, 230px);
+}
+
+.timer-panel.is-fullscreen .progress-bar {
+  height: 14px;
+  margin-top: 8px;
+}
+
+.timer-panel.is-fullscreen .timer-actions {
+  margin-top: 16px;
+}
+
+.timer-panel.is-fullscreen .timer-actions button {
+  min-height: 64px;
+  font-size: 18px;
 }
 
 .exit-fullscreen-button {
@@ -934,5 +951,44 @@ td:first-child {
 
   .segmented {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .timer-panel.is-fullscreen {
+    min-height: 100dvh;
+    padding: 12px 18px 62px;
+    gap: 8px;
+  }
+
+  .timer-panel.is-fullscreen .timer-title-row {
+    display: flex;
+  }
+
+  .timer-panel.is-fullscreen h2 {
+    font-size: 24px;
+  }
+
+  .timer-panel.is-fullscreen p {
+    margin-top: 0;
+  }
+
+  .timer-panel.is-fullscreen .time-readout {
+    margin-top: 2px;
+    font-size: min(48vh, 220px);
+  }
+
+  .timer-panel.is-fullscreen .progress-bar {
+    width: min(78vw, 980px);
+    margin-top: 0;
+  }
+
+  .timer-panel.is-fullscreen .timer-actions {
+    width: min(78vw, 980px);
+    margin-top: 6px;
+  }
+
+  .timer-panel.is-fullscreen .timer-actions button {
+    min-height: 50px;
   }
 }
