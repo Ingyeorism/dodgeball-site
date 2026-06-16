@@ -378,7 +378,13 @@ function App() {
       }
     });
 
-    return table.sort((a, b) => b.points - a.points || b.win - a.win || a.name.localeCompare(b.name, 'ko'));
+    return table
+      .sort((a, b) => b.points - a.points || b.win - a.win || a.name.localeCompare(b.name, 'ko'))
+      .map((team, index, sortedTable) => {
+        const previousTeam = sortedTable[index - 1];
+        const rank = previousTeam && previousTeam.points === team.points ? previousTeam.rank : index + 1;
+        return { ...team, rank };
+      });
   }, [matches]);
 
   const handleLogin = (event) => {
@@ -530,18 +536,20 @@ function Standings({ standings }) {
               <th>순위</th>
               <th>학급</th>
               <th>총점</th>
+              <th>경기</th>
               <th>전적</th>
             </tr>
           </thead>
           <tbody>
             {standings.map((team, index) => (
-              <tr key={team.name} className={index === 0 ? 'leader' : ''}>
+              <tr key={team.name} className={team.rank === 1 ? 'leader' : ''}>
                 <td>
-                  {index < 3 && <Crown className={`crown rank-${index + 1}`} size={18} />}
-                  <strong>{index + 1}</strong>
+                  {team.rank <= 3 && <Crown className={`crown rank-${team.rank}`} size={18} />}
+                  <strong>{team.rank}</strong>
                 </td>
                 <td>{team.name}</td>
                 <td className="points">{team.points}</td>
+                <td>{team.played}</td>
                 <td>
                   {team.win}승 {team.draw}무 {team.lose}패
                 </td>
