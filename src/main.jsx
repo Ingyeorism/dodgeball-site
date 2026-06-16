@@ -382,7 +382,9 @@ function App() {
       .sort((a, b) => b.points - a.points || b.win - a.win || a.name.localeCompare(b.name, 'ko'))
       .map((team, index, sortedTable) => {
         const previousTeam = sortedTable[index - 1];
-        const rank = previousTeam && previousTeam.points === team.points ? previousTeam.rank : index + 1;
+        const rank = previousTeam && previousTeam.points === team.points
+          ? sortedTable.findIndex((rankedTeam) => rankedTeam.points === team.points) + 1
+          : index + 1;
         return { ...team, rank };
       });
   }, [matches]);
